@@ -1,0 +1,50 @@
+/**
+ * Hack ALU.
+ * Computes one of: 0, 1, -1, x, y, !x, !y, -x, -y,
+ * x+1, y+1, x-1, y-1, x+y, x-y, y-x, x&y, x|y.
+ * The control bits follow the Hack machine-language specification.
+ */
+CHIP ALU {
+    IN
+        x[16], y[16],
+        zx, // Zero the x input
+        nx, // Negate the x input
+        zy, // Zero the y input
+        ny, // Negate the y input
+        f,  // 1 = add, 0 = bitwise AND
+        no; // Negate the output
+
+    OUT
+        out[16],
+        zr, // True when out == 0
+        ng; // True when out < 0 (most significant bit is 1)
+
+    PARTS:
+    // Prepare x.
+    Mux16(a=x, b=false, sel=zx, out=xZeroed);
+    Not16(in=xZeroed, out=notXZeroed);
+    Mux16(a=xZeroed, b=notXZeroed, sel=nx, out=xPrepared);
+
+    // Prepare y.
+    Mux16(a=y, b=false, sel=zy, out=yZeroed);
+    Not16(in=yZeroed, out=notYZeroed);
+    Mux16(a=yZeroed, b=notYZeroed, sel=ny, out=yPrepared);
+
+    // Select arithmetic addition or bitwise AND.
+    And16(a=xPrepared, b=yPrepared, out=andResult);
+    Add16(a=xPrepared, b=yPrepared, out=addResult);
+    Mux16(a=andResult, b=addResult, sel=f, out=baseResult);
+
+    // Optionally negate the result.
+    Not16(in=baseResult, out=notBaseResult);
+    Mux16(a=baseResult, b=notBaseResult, sel=no, out=out);
+
+    // zr = !(out[0] | ... | out[15]).
+    Or8Way(in=out[0..7], out=orLow);
+    Or8Way(in=out[8..15], out=orHigh);
+    Or(a=orLow, b=orHigh, out=orAny);
+    Not(in=orAny, out=zr);
+
+    // In two's-complement representation, a set sign bit means negative.
+    And(a=out[15], b=true, out=ng);
+}

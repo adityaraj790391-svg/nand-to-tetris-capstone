@@ -1,0 +1,1 @@
+Assembled Box.asm -> Box.hack (50 instructions)

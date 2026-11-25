@@ -1,0 +1,4 @@
+Prepared for Aditya Raj (Roll No. 2501730238, K=38).
+This is a fresh reference implementation prepared for this GitHub package.
+It has not been run in the user's Hardware Simulator in this environment.
+Run the official Nand2Tetris test scripts and keep genuine test outputs.

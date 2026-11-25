@@ -1,0 +1,69 @@
+/**
+ * Hack CPU.
+ * Executes one 16-bit Hack instruction per clock cycle.
+ */
+CHIP CPU {
+    IN
+        inM[16],          // Value read from data memory (RAM / Screen / Keyboard)
+        instruction[16],  // Current instruction from instruction memory
+        reset;            // Reset the program counter
+
+    OUT
+        outM[16],       // Value to write to data memory
+        writeM,         // Write enable for data memory
+        addressM[15],   // Data-memory address
+        pc[15];         // Next instruction address
+
+    PARTS:
+    // A-instruction when instruction[15] == 0.
+    Not(in=instruction[15], out=isAInstruction);
+
+    // The ALU's y input is A (a=0) or memory (a=1).
+    ARegister(in=aRegisterInput, load=loadA, out=aRegisterValue,
+              out[0..14]=addressM);
+    DRegister(in=outM, load=loadD, out=dRegisterValue);
+
+    Mux16(a=aRegisterValue, b=inM, sel=instruction[12], out=aluY);
+
+    ALU(
+        x=dRegisterValue,
+        y=aluY,
+        zx=instruction[11],
+        nx=instruction[10],
+        zy=instruction[9],
+        ny=instruction[8],
+        f=instruction[7],
+        no=instruction[6],
+        out=outM,
+        zr=aluIsZero,
+        ng=aluIsNegative
+    );
+
+    // A receives the literal for an A-instruction, or the ALU result
+    // when a C-instruction writes to destination A.
+    Mux16(a=outM, b=instruction, sel=isAInstruction, out=aRegisterInput);
+    And(a=instruction[15], b=instruction[5], out=writeAFromC);
+    Or(a=isAInstruction, b=writeAFromC, out=loadA);
+
+    // C-instruction destination bits: A=bit 5, D=bit 4, M=bit 3.
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    // Decode the Hack jump field. The least-significant jump bit
+    // enables positive jumps, the middle bit zero jumps, and the
+    // most-significant bit negative jumps.
+    Not(in=aluIsZero, out=aluIsNotZero);
+    Not(in=aluIsNegative, out=aluIsNotNegative);
+    And(a=aluIsNotZero, b=aluIsNotNegative, out=aluIsPositive);
+
+    And(a=instruction[0], b=aluIsPositive, out=jumpOnPositive);
+    And(a=instruction[1], b=aluIsZero, out=jumpOnZero);
+    And(a=instruction[2], b=aluIsNegative, out=jumpOnNegative);
+    Or(a=jumpOnPositive, b=jumpOnZero, out=jumpPositiveOrZero);
+    Or(a=jumpPositiveOrZero, b=jumpOnNegative, out=jumpCondition);
+    And(a=instruction[15], b=jumpCondition, out=loadPC);
+
+    // PC loads the current A-register value on a taken jump.
+    PC(in=aRegisterValue, load=loadPC, inc=true, reset=reset,
+       out=pcFull, out[0..14]=pc);
+}

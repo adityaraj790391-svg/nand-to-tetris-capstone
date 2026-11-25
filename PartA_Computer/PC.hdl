@@ -1,0 +1,15 @@
+/**
+ * 16-bit program counter.
+ * Priority: reset, then load, then increment, otherwise hold.
+ */
+CHIP PC {
+    IN in[16], load, inc, reset;
+    OUT out[16];
+
+    PARTS:
+    Inc16(in=out, out=incremented);
+    Mux16(a=out, b=incremented, sel=inc, out=holdOrIncrement);
+    Mux16(a=holdOrIncrement, b=in, sel=load, out=loadOrPrevious);
+    Mux16(a=loadOrPrevious, b=false, sel=reset, out=nextValue);
+    Register(in=nextValue, load=true, out=out);
+}
